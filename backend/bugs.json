@@ -1,0 +1,102 @@
+[
+  {
+    "id": 1,
+    "title": "NullPointerException",
+    "language": "Java",
+    "category": "Runtime Error",
+    "description": "The program crashes when accessing a property of an object that has not been initialized.",
+    "root_cause": "The object reference is null when the program tries to access one of its fields or methods.",
+    "solution": "Initialize the object before accessing its properties. Alternatively, check whether the reference is null.",
+    "example": "if (user != null) {\n    System.out.println(user.getName());\n}"
+  },
+  {
+    "id": 2,
+    "title": "ArrayIndexOutOfBoundsException",
+    "language": "Java",
+    "category": "Runtime Error",
+    "description": "The program tries to access an array element using an index outside the valid range.",
+    "root_cause": "The index is negative or greater than or equal to the array length.",
+    "solution": "Check that the index is between zero and array length minus one before accessing the array.",
+    "example": "if (index >= 0 && index < arr.length) {\n    System.out.println(arr[index]);\n}"
+  },
+  {
+    "id": 3,
+    "title": "IndexError: List Index Out of Range",
+    "language": "Python",
+    "category": "Runtime Error",
+    "description": "A Python program attempts to retrieve an element from a list using an invalid index.",
+    "root_cause": "The list is shorter than expected or the program calculates an invalid index.",
+    "solution": "Check the list length and validate the index before accessing the element.",
+    "example": "if 0 <= index < len(items):\n    print(items[index])"
+  },
+  {
+    "id": 4,
+    "title": "Segmentation Fault",
+    "language": "C",
+    "category": "Memory Error",
+    "description": "A C program crashes because it accesses memory that it is not permitted to access.",
+    "root_cause": "Possible causes include dereferencing an invalid pointer, accessing memory after it has been freed, or accessing memory outside an array.",
+    "solution": "Check pointer validity, ensure allocated memory is used correctly, and validate array boundaries.",
+    "example": "int value = 10;\nint *ptr = &value;\nprintf(\"%d\", *ptr);"
+  },
+  {
+    "id": 5,
+    "title": "SyntaxError",
+    "language": "Python",
+    "category": "Syntax Error",
+    "description": "Python cannot parse a statement because the code violates its syntax rules.",
+    "root_cause": "Possible causes include missing colons, unmatched parentheses, or incorrectly structured statements.",
+    "solution": "Inspect the reported line and correct the syntax according to Python rules.",
+    "example": "if number > 0:\n    print(number)"
+  },
+  {
+    "id": 6,
+    "title": "TypeError: Unsupported Operand",
+    "language": "Python",
+    "category": "Type Error",
+    "description": "A Python operation fails because its operands have incompatible types.",
+    "root_cause": "The program attempts an operation that is not supported for the supplied data types.",
+    "solution": "Check the types of the operands and convert them when appropriate.",
+    "example": "age = int(input(\"Enter age: \"))\nprint(age + 1)"
+  },
+  {
+    "id": 7,
+    "title": "NumberFormatException",
+    "language": "Java",
+    "category": "Input Error",
+    "description": "Java cannot convert a string into the requested numeric format.",
+    "root_cause": "The input string contains characters or formatting that cannot be parsed as a number.",
+    "solution": "Validate the input before parsing it and handle NumberFormatException when necessary.",
+    "example": "try {\n    int number = Integer.parseInt(input);\n} catch (NumberFormatException e) {\n    System.out.println(\"Invalid number\");\n}"
+  },
+  {
+    "id": 8,
+    "title": "KeyError",
+    "language": "Python",
+    "category": "Lookup Error",
+    "description": "A Python dictionary lookup fails because the requested key does not exist.",
+    "root_cause": "The program accesses a dictionary using a key that is absent from the dictionary.",
+    "solution": "Check whether the key exists or use the dictionary get method when an optional value is acceptable.",
+    "example": "name = student.get(\"name\", \"Unknown\")"
+  },
+  {
+    "id": 9,
+    "title": "IndexOutOfBoundsException",
+    "language": "Java",
+    "category": "Runtime Error",
+    "description": "A Java list operation fails because the requested index is outside the list's valid range.",
+    "root_cause": "The index is negative or is greater than or equal to the list size.",
+    "solution": "Check the list size and ensure the requested index is valid.",
+    "example": "if (index >= 0 && index < list.size()) {\n    System.out.println(list.get(index));\n}"
+  },
+  {
+    "id": 10,
+    "title": "Null Pointer Access in C++",
+    "language": "C++",
+    "category": "Memory Error",
+    "description": "A C++ program attempts to access an object through a null pointer.",
+    "root_cause": "The pointer does not refer to a valid object when the program dereferences it.",
+    "solution": "Initialize the pointer appropriately and verify that it refers to a valid object before dereferencing it.",
+    "example": "if (ptr != nullptr) {\n    ptr->display();\n}"
+  }
+]
