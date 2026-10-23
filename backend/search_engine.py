@@ -23,7 +23,6 @@ def load_bugs():
     with open(DATASET_PATH, "r", encoding="utf-8") as file:
         return json.load(file)
 
-
 def initialize_database():
     bugs = load_bugs()
 
@@ -37,7 +36,7 @@ def initialize_database():
             ),
         )
 
-    # Create payload indexes for filtering
+    # Create payload indexes if they don't already exist
     collection_info = client.get_collection(COLLECTION_NAME)
 
     if collection_info.points_count == 0:
@@ -53,12 +52,54 @@ def initialize_database():
             field_schema=models.PayloadSchemaType.KEYWORD,
         )
 
-        # Convert bug descriptions into vectors
+    # Retrieve existing bug IDs from Qdrant
+    existing_ids = set()
+    offset = None
+
+    while True:
+        records, next_offset = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=100,
+            offset=offset,
+            with_payload=False,
+            with_vectors=False,
+        )
+
+        existing_ids.update(record.id for record in records)
+
+        if next_offset is None:
+            break
+
+        offset = next_offset
+
+    # Identify bugs that are new or have changed
+    bugs_to_sync = []
+
+    for bug in bugs:
+        if bug["id"] not in existing_ids:
+            bugs_to_sync.append(bug)
+            continue
+
+        stored_records = client.retrieve(
+            collection_name=COLLECTION_NAME,
+            ids=[bug["id"]],
+            with_payload=True,
+            with_vectors=False,
+        )
+
+        if not stored_records or any(
+            stored_records[0].payload.get(key) != value
+            for key, value in bug.items()
+        ):
+            bugs_to_sync.append(bug)
+
+    # Generate embeddings and synchronize changed records
+    if bugs_to_sync:
         texts = [
             f"{bug['title']}. {bug['description']}. "
             f"Root cause: {bug['root_cause']}. "
             f"Solution: {bug['solution']}"
-            for bug in bugs
+            for bug in bugs_to_sync
         ]
 
         vectors = model.encode(texts, normalize_embeddings=True)
@@ -69,7 +110,7 @@ def initialize_database():
                 vector=vector.tolist(),
                 payload=bug,
             )
-            for bug, vector in zip(bugs, vectors)
+            for bug, vector in zip(bugs_to_sync, vectors)
         ]
 
         client.upsert(
@@ -77,8 +118,10 @@ def initialize_database():
             points=points,
         )
 
-    print(f"Database initialized with {len(bugs)} sample bugs.")
-
+    print(
+        f"Database synchronized: {len(bugs)} bugs in the dataset; "
+        f"{len(bugs_to_sync)} inserted or updated."
+    )
 
 def search_bugs(query, language="All Languages", limit=5):
     query_vector = model.encode(

@@ -1,16 +1,51 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
-import { searchBugs } from "./services/api";
+import { searchBugs, checkBackendHealth } from "./services/api";
+
 
 function App() {
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("All Languages");
+
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [backendChecking, setBackendChecking] = useState(true);
 
   const [results, setResults] = useState([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedBug, setSelectedBug] = useState(null);
+  useEffect(() => {
+    let active = true;
+
+    const checkHealth = async () => {
+      try {
+        await checkBackendHealth();
+
+        if (active) {
+          setBackendOnline(true);
+        }
+      } catch {
+        if (active) {
+          setBackendOnline(false);
+        }
+      } finally {
+        if (active) {
+          setBackendChecking(false);
+        }
+      }
+    };
+
+    checkHealth();
+
+    const interval = setInterval(checkHealth, 10000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -74,10 +109,26 @@ function App() {
     </a>
   </div>
 
-  <div className="nav-right">
-    <span className="status-dot"></span>
-    <span className="nav-label">Bug Intelligence</span>
-  </div>
+<div className="nav-right">
+  <span
+    className={`status-dot ${
+      backendChecking
+        ? "status-checking"
+        : backendOnline
+          ? "status-online"
+          : "status-offline"
+    }`}
+  ></span>
+
+  <span className="nav-label">
+    {backendChecking
+      ? "Checking Backend"
+      : backendOnline
+        ? "Backend Online"
+        : "Backend Offline"}
+  </span>
+</div>
+
 </nav>
 
       <main className="main-content" id="home">
@@ -250,10 +301,23 @@ function App() {
               <h3>Suggested solution</h3>
               <p>{selectedBug.solution}</p>
 
-              <h3>Example code</h3>
-              <pre>
-                <code>{selectedBug.example}</code>
-              </pre>
+
+<div className="code-comparison">
+  <h3>❌ Buggy code</h3>
+  <pre className="code-block">
+    <code>
+      {selectedBug.buggy_code || "Buggy code not available."}
+    </code>
+  </pre>
+
+  <h3>✅ Corrected code</h3>
+  <pre className="code-block">
+    <code>
+      {selectedBug.fixed_code || "Corrected code not available."}
+    </code>
+  </pre>
+</div>
+
 
               <p className="solution-note">
                 This is a suggested fix based on a similar recorded issue.
