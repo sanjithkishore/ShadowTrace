@@ -24,85 +24,48 @@ def load_bugs():
         return json.load(file)
 
 def initialize_database():
-    bugs = load_bugs()
-
-    # Create the collection if it doesn't exist
+# Create the collection if it doesn't exist
     if not client.collection_exists(COLLECTION_NAME):
         client.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=models.VectorParams(
-                size=model.get_sentence_embedding_dimension(),
-                distance=models.Distance.COSINE,
-            ),
-        )
+        collection_name=COLLECTION_NAME,
+        vectors_config=models.VectorParams(
+        size=model.get_sentence_embedding_dimension(),
+        distance=models.Distance.COSINE,
+),
+)
 
-    # Create payload indexes if they don't already exist
-    collection_info = client.get_collection(COLLECTION_NAME)
+# Check whether the collection contains any records
+collection_info = client.get_collection(COLLECTION_NAME)
 
-    if collection_info.points_count == 0:
-        client.create_payload_index(
-            collection_name=COLLECTION_NAME,
-            field_name="language",
-            field_schema=models.PayloadSchemaType.KEYWORD,
-        )
+# Create payload indexes if they don't exist
+if collection_info.points_count == 0:
+    client.create_payload_index(
+        collection_name=COLLECTION_NAME,
+        field_name="language",
+        field_schema=models.PayloadSchemaType.KEYWORD,
+    )
 
-        client.create_payload_index(
-            collection_name=COLLECTION_NAME,
-            field_name="category",
-            field_schema=models.PayloadSchemaType.KEYWORD,
-        )
+    client.create_payload_index(
+        collection_name=COLLECTION_NAME,
+        field_name="category",
+        field_schema=models.PayloadSchemaType.KEYWORD,
+    )
 
-    # Retrieve existing bug IDs from Qdrant
-    existing_ids = set()
-    offset = None
+    # Load the original dataset only when the collection is empty
+    bugs = load_bugs()
 
-    while True:
-        records, next_offset = client.scroll(
-            collection_name=COLLECTION_NAME,
-            limit=100,
-            offset=offset,
-            with_payload=False,
-            with_vectors=False,
-        )
-
-        existing_ids.update(record.id for record in records)
-
-        if next_offset is None:
-            break
-
-        offset = next_offset
-
-    # Identify bugs that are new or have changed
-    bugs_to_sync = []
-
-    for bug in bugs:
-        if bug["id"] not in existing_ids:
-            bugs_to_sync.append(bug)
-            continue
-
-        stored_records = client.retrieve(
-            collection_name=COLLECTION_NAME,
-            ids=[bug["id"]],
-            with_payload=True,
-            with_vectors=False,
-        )
-
-        if not stored_records or any(
-            stored_records[0].payload.get(key) != value
-            for key, value in bug.items()
-        ):
-            bugs_to_sync.append(bug)
-
-    # Generate embeddings and synchronize changed records
-    if bugs_to_sync:
+    if bugs:
         texts = [
             f"{bug['title']}. {bug['description']}. "
             f"Root cause: {bug['root_cause']}. "
             f"Solution: {bug['solution']}"
-            for bug in bugs_to_sync
+            for bug in bugs
         ]
 
-        vectors = model.encode(texts, normalize_embeddings=True)
+        vectors = model.encode(
+            texts,
+            normalize_embeddings=True,
+        )
 
         points = [
             models.PointStruct(
@@ -110,7 +73,7 @@ def initialize_database():
                 vector=vector.tolist(),
                 payload=bug,
             )
-            for bug, vector in zip(bugs_to_sync, vectors)
+            for bug, vector in zip(bugs, vectors)
         ]
 
         client.upsert(
@@ -118,10 +81,14 @@ def initialize_database():
             points=points,
         )
 
+    print(f"Initialized Qdrant with {len(bugs)} seed records.")
+
+else:
     print(
-        f"Database synchronized: {len(bugs)} bugs in the dataset; "
-        f"{len(bugs_to_sync)} inserted or updated."
+        "Existing Qdrant data found. "
+        "Preserving existing records."
     )
+
 
 def search_bugs(query, language="All Languages", limit=5):
     query_vector = model.encode(
@@ -156,6 +123,98 @@ def search_bugs(query, language="All Languages", limit=5):
         }
         for result in results
     ]
+def get_all_bugs():
+    records = []
+    offset = None
+
+    while True:
+        points, next_offset = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=100,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+
+        for point in points:
+            records.append(point.payload)
+
+        if next_offset is None:
+            break
+
+        offset = next_offset
+
+    return sorted(records, key=lambda bug: bug["id"])
+def add_bug(bug):
+    # Generate an embedding from the bug's meaningful text
+    text = (
+        f"{bug['title']}. {bug['description']}. "
+        f"Root cause: {bug['root_cause']}. "
+        f"Solution: {bug['solution']}"
+    )
+
+    vector = model.encode(
+        text,
+        normalize_embeddings=True,
+    ).tolist()
+
+    # Store the bug and its vector in Qdrant
+    point = models.PointStruct(
+        id=bug["id"],
+        vector=vector,
+        payload=bug,
+    )
+
+    client.upsert(
+        collection_name=COLLECTION_NAME,
+        points=[point],
+    )
+
+    return bug
+
+def update_bug(bug_id, updated_data):
+    # Check whether the bug exists
+    existing_records = client.retrieve(
+        collection_name=COLLECTION_NAME,
+        ids=[bug_id],
+        with_payload=True,
+        with_vectors=False,
+    )
+
+    if not existing_records:
+        return None
+
+    # Preserve the ID and merge the updated fields
+    bug = {
+        **existing_records[0].payload,
+        **updated_data,
+        "id": bug_id,
+    }
+
+    # Store the updated record and regenerate its embedding
+    add_bug(bug)
+
+    return bug
+
+def delete_bug(bug_id):
+    existing_records = client.retrieve(
+    collection_name=COLLECTION_NAME,
+    ids=[bug_id],
+    with_payload=False,
+    with_vectors=False,
+    )
+
+    if not existing_records:
+        return False
+
+    client.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=models.PointIdsList(
+        points=[bug_id],
+        ),
+    )
+
+    return True
 
 
 if __name__ == "__main__":
